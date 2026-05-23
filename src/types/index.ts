@@ -61,3 +61,31 @@ export interface APIResponse<T = any> {
   data?: T;
   error?: string;
 }
+
+// Add this to your existing file (e.g., src/types/index.ts)
+
+// 1. Individual item wrapping a product database record with an active quantity
+export interface CartItem {
+  product: Product;
+  quantity: number;
+}
+
+// 2. The global context state blueprint that resolved the error block
+export interface CartState {
+  items: CartItem[];
+  addItem: (product: Product, quantity?: number) => void;
+  removeItem: (productId: string) => void;
+  updateQuantity: (productId: string, quantity: number) => void;
+  clearCart: () => void;
+  getCartTotal: () => number;
+}
+
+// 2. The global context state blueprint that resolved the error block
+export interface CartState {
+  items: CartItem[];
+  addItem: (product: Product, quantity?: number) => void;
+  removeItem: (productId: string) => void;
+  updateQuantity: (productId: string, quantity: number) => void;
+  clearCart: () => void;
+  getCartTotal: () => number;
+}
