@@ -32,16 +32,28 @@ export default function CheckoutClient() {
     setIsSubmitting(true);
 
     try {
-      // Mocking our API route processing gateway logic for this layer
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // 1. Fire parameters to our secure Stripe payment engine endpoint
+      const response = await fetch('/api/checkout/stripe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      });
 
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Gateway interaction exception');
+      }
+
+      // 2. Capture clientSecret and simulate a successful payment processing event
+      console.log('Stripe Sandbox ClientSecret Generated:', data.clientSecret);
+
+      // Trigger successful local view state transformations
       setOrderPlaced(true);
       clearCart();
-    } catch (error) {
-      console.error('Checkout routing failure:', error);
-      alert(
-        'An error occurred while routing your checkout payment parameters.',
-      );
+    } catch (error: any) {
+      console.error('Payment failure routing event:', error);
+      alert(`Payment Gateway Error: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
