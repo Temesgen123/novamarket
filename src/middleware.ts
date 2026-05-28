@@ -1,54 +1,39 @@
-// src/middleware.ts
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+// src/proxy.ts (or src/middleware.ts)
+import NextAuth from "next-auth";
+import { authConfig } from "./auth.config";
+import { NextResponse } from "next/server";
 
-/**
- * High-performance Edge Middleware boundary router.
- * Evaluates credentials prior to page chunk rendering.
- */
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+const { auth: authMiddleware } = NextAuth(authConfig);
 
-  // 1. Target all routes falling under the administrative path umbrella
-  if (pathname.startsWith('/admin')) {
+export default authMiddleware((req) => {
+  const { nextUrl } = req;
+  const isLoggedIn = !!req.auth;
+
+  const isAdminRoute = nextUrl.pathname.startsWith("/admin");
+  const isLoginRoute = nextUrl.pathname === "/login";
+
+  // Case A: Unauthenticated user targets protected administrative dash space
+  if (isAdminRoute && !isLoggedIn) {
+    let callbackUrl = nextUrl.pathname;
+    if (nextUrl.search) {
+      callbackUrl += nextUrl.search;
+    }
     
-    // 2. Read the authentication session cookie tokens
-    // Replace 'novamarket_session' with your Auth library token (e.g., NextAuth, Kinde, Clerk)
-    const sessionToken = request.cookies.get('novamarket_session')?.value;
-    const userRole = request.cookies.get('novamarket_role')?.value;
-
-    // 3. Enforcement Guardrail A: No active session whatsoever
-    if (!sessionToken) {
-      const loginUrl = new URL('/login', request.url);
-      // Save the intercepted destination path so we can redirect them back post-login
-      loginUrl.searchParams.set('callbackUrl', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    // 4. Enforcement Guardrail B: Logged in, but lacks administrative clearance
-    if (userRole !== 'ADMIN') {
-      // Redirect to a clean 403 Access Denied layout route
-      return NextResponse.redirect(new URL('/unauthorized', request.url));
-    }
+    const encodedCallback = encodeURIComponent(callbackUrl);
+    return NextResponse.redirect(new URL(`/login?callbackUrl=${encodedCallback}`, nextUrl));
   }
 
-  // Allow the request to pass through cleanly if validation passes
-  return NextResponse.next();
-}
+  // Case B: User with valid session lands back on login page -> instantly skip ahead
+  if (isLoginRoute && isLoggedIn) {
+    const role = req.auth?.token?.role || "CUSTOMER";
+    const target = role === "ADMIN" ? "/admin/dashboard" : "/products";
+    return NextResponse.redirect(new URL(target, nextUrl));
+  }
 
-/**
- * Configure optimized Route Matchers.
- * This prevents our middleware from running on static image assets, scripts, or favicon files.
- */
+  return NextResponse.next();
+});
+
+// Avoid executing auth cycles against structural media payloads, static assets, or images
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|images).*)"],
 };
