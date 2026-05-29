@@ -1,10 +1,9 @@
-// src/server/actions/reviews.ts
+/// src/server/actions/reviews.ts
 'use server';
 
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
-import { APIResponse } from '@/types';
 
 export interface CreateReviewInput {
   productId: string;
@@ -12,35 +11,35 @@ export interface CreateReviewInput {
   comment: string;
 }
 
-export async function createProductReview(input: CreateReviewInput): Promise<APIResponse<any>> {
+export async function createProductReview(input: CreateReviewInput) {
   try {
-    // 1. Enforce active identity clearance checks
+    // 1. Authenticate the active user session
     const session = await auth();
     if (!session || !session.user?.id) {
-      return { success: false, error: 'You must be authenticated to leave a product review.' };
+      return { success: false, error: 'You must be logged in to write a review.' };
     }
 
-    // 2. Bound data sanitization rules
+    // 2. Validate input constraints
     if (input.rating < 1 || input.rating > 5 || !input.comment.trim()) {
-      return { success: false, error: 'Invalid ratings score or missing review commentary text.' };
+      return { success: false, error: 'Invalid rating score or empty review comment.' };
     }
 
-    // 3. Commit data write to PostgreSQL engine
+    // 3. Write data to your PostgreSQL cluster
     await prisma.review.create({
       data: {
         rating: input.rating,
-        comment: input.comment,
+        comment: input.comment.trim(),
         productId: input.productId,
         userId: session.user.id,
       },
     });
 
-    // Purge cached item detail routes to sync fresh metrics
+    // Clear Next.js data caches so the static page updates instantly
     revalidatePath(`/products/${input.productId}`);
     return { success: true };
     
   } catch (error) {
-    console.error('Failed to register customer review:', error);
-    return { success: false, error: 'Database pipeline mutation crash.' };
+    console.error('Database write error during review submission:', error);
+    return { success: false, error: 'Failed to save review to the database.' };
   }
 }
