@@ -18,10 +18,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           where: { email: credentials.email as string },
         });
 
-        if (!user || !user.password) return null;
+        if (!user || !user.passwordHash) return null;
 
         // For absolute safety, swap this string equality check out for bcrypt.compare() later
-        const isPasswordValid = credentials.password === user.password;
+       const isPasswordValid = credentials.password === user.passwordHash;
         if (!isPasswordValid) return null;
 
         return {

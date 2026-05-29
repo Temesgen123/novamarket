@@ -19,54 +19,85 @@ enum OrderStatus {
   CANCELLED
 }
 
-model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  passwordHash  String?  
-  name          String?
-  role          Role     @default(CUSTOMER)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  orders        Order[]
-  addresses     Address[]
-}
-
 model Address {
-  id         String   @id @default(uuid())
+  id         String  @id @default(uuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   street     String
   city       String
   state      String
   postalCode String
   country    String
-  isDefault  Boolean  @default(false)
+  isDefault  Boolean @default(false)
+}
+
+// prisma/schema.prisma
+
+// prisma/schema.prisma
+
+model User {
+  id           String   @id @default(uuid())
+  name         String?
+  email        String   @unique
+  passwordHash String?
+  role         String   @default("CUSTOMER")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // 1. Keep our new reviews field
+  reviews Review[]
+
+  // 2. RESTORE THESE LINES: Fixes the Address and Order validation crashes
+  addresses Address[]
+  orders    Order[]
 }
 
 model Product {
-  id            String      @id @default(uuid())
+  id            String   @id @default(uuid())
   title         String
   description   String
-  price         Decimal     @db.Decimal(10, 2)
-  salePrice     Decimal?    @db.Decimal(10, 2)
-  stockQuantity Int         @default(0)
-  images        String[]    
+  price         Decimal
+  salePrice     Decimal?
+  stockQuantity Int
   category      String
-  isFeatured    Boolean     @default(false)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  orderItems    OrderItem[]
+  images        String[]
+  isFeatured    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // 3. Keep our new reviews field
+  reviews Review[]
+
+  // 4. RESTORE THIS LINE: Fixes the OrderItem validation crash
+  orderItems OrderItem[]
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int // Enforced between 1 and 5 stars on the frontend
+  comment   String   @db.Text
+  createdAt DateTime @default(now())
+
+  // Foreign Key Handshaking
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([userId])
 }
 
 model Order {
   id              String      @id @default(uuid())
-  userId          String?     
+  userId          String?
   user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  guestEmail      String?     
+  guestEmail      String?
   status          OrderStatus @default(PENDING)
   totalAmount     Decimal     @db.Decimal(10, 2)
-  stripeSessionId String      @unique 
-  shippingAddress Json        
+  stripeSessionId String      @unique
+  shippingAddress Json
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   items           OrderItem[]
@@ -79,5 +110,5 @@ model OrderItem {
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
   quantity  Int
-  price    Decimal @db.Decimal(10, 2) 
+  price     Decimal @db.Decimal(10, 2)
 }

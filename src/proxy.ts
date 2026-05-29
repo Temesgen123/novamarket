@@ -1,31 +1,31 @@
-// src/proxy.ts (or src/middleware.ts)
+// src/proxy.ts
 import NextAuth from "next-auth";
 import { authConfig } from "./auth.config";
 import { NextResponse } from "next/server";
 
-const { auth: authMiddleware } = NextAuth(authConfig);
+// Pull out NextAuth's native execution loop
+const { auth: proxyAuth } = NextAuth(authConfig);
 
-export default authMiddleware((req) => {
+export default proxyAuth((req) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
 
   const isAdminRoute = nextUrl.pathname.startsWith("/admin");
   const isLoginRoute = nextUrl.pathname === "/login";
 
-  // Case A: Unauthenticated user targets protected administrative dash space
+  // Route protection guardrail
   if (isAdminRoute && !isLoggedIn) {
     let callbackUrl = nextUrl.pathname;
     if (nextUrl.search) {
       callbackUrl += nextUrl.search;
     }
-    
     const encodedCallback = encodeURIComponent(callbackUrl);
     return NextResponse.redirect(new URL(`/login?callbackUrl=${encodedCallback}`, nextUrl));
   }
 
-  // Case B: User with valid session lands back on login page -> instantly skip ahead
   if (isLoginRoute && isLoggedIn) {
-    const role = req.auth?.token?.role || "CUSTOMER";
+    // Fixed: Pull the custom string property directly from your typed session user object
+    const role = req.auth?.user?.role || "CUSTOMER";
     const target = role === "ADMIN" ? "/admin/dashboard" : "/products";
     return NextResponse.redirect(new URL(target, nextUrl));
   }
@@ -33,7 +33,6 @@ export default authMiddleware((req) => {
   return NextResponse.next();
 });
 
-// Avoid executing auth cycles against structural media payloads, static assets, or images
 export const config = {
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico|images).*)"],
 };
